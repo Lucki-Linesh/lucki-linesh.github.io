@@ -107,6 +107,23 @@ a {
   border-color: rgba(224, 36, 179, 0.42);
 }
 
+.marquee-track {
+  animation: gdf-marquee 30s linear infinite;
+}
+
+.marquee-track:hover {
+  animation-play-state: paused;
+}
+
+@keyframes gdf-marquee {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
 .noise-overlay {
   pointer-events: none;
   position: fixed;
