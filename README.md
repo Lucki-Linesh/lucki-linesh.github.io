@@ -29,5 +29,8 @@ git push origin arena/01a0d272-lucki-linesh-github-io
 
 1. In GitHub, open `https://github.com/Lucki-Linesh/lucki-linesh.github.io/settings/pages`.
 2. Set **Build and deployment** source to **GitHub Actions**.
-3. Push this branch and open a pull request into `main`, or manually run the `Deploy GDF site to GitHub Pages` workflow.
-4. After the workflow completes, the site is available at `https://lucki-linesh.github.io/`.
+3. Merge the pull request from `arena/01a0d272-lucki-linesh-github-io` into `main`.
+4. The `Deploy GDF site to GitHub Pages` workflow will build the Vite app and deploy `dist/`.
+5. After the workflow completes, the site is available at `https://lucki-linesh.github.io/`.
+
+If you need to redeploy without a new commit, open `Actions`, select `Deploy GDF site to GitHub Pages`, choose `Run workflow`, and run it from the `main` branch.
