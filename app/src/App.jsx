@@ -1,76 +1,55 @@
-import { useEffect, useMemo, useState } from 'react';
-import { motion } from 'framer-motion';
+import { useCallback, useEffect, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
   ArrowRight,
-  BadgeCheck,
+  ArrowUpRight,
   CalendarClock,
+  Compass,
   Globe2,
   Mail,
+  Menu,
   Moon,
   Phone,
+  Quote,
   Sparkles,
   Sun,
-  UsersRound,
+  Target,
+  Users,
+  X,
 } from 'lucide-react';
 
-const navItems = [
-  { label: 'THE FUTURE', href: '#future' },
-  { label: 'VIRTUAL MUN', href: '#experiences' },
-  { label: 'VISION', href: '#vision' },
-  { label: 'OUR PARTNERS', href: '#partners' },
-  { label: 'CORE TEAM', href: '#team' },
-];
+import { about, axis, conferences, footer, home, pages, partners, site, team } from './content';
 
-const conferences = [
-  { title: 'GLO DIS I 2026', status: 'Registrations Closed', tone: 'closed' },
-  { title: 'GLO DIS II 2026', status: 'Registrations Closed', tone: 'closed' },
-  { title: 'GLO DIS III 2026', status: 'Registrations Closed', tone: 'closed' },
-  { title: 'GLO DIS IV 2026', status: 'Registrations Closed', tone: 'closed' },
-  { title: 'GLO DIS V 2026', status: 'Register Now', tone: 'active' },
-  { title: 'GLO DIS VI 2026', status: 'Coming Soon', tone: 'soon' },
-  { title: 'GLO DIS VII 2026', status: 'Coming Soon', tone: 'soon' },
-  { title: 'GLO DIS VIII 2026', status: 'Coming Soon', tone: 'soon' },
-];
-
-const partners = [
-  { category: 'REWARD PARTNERS', brands: ['Canva', 'Notion'] },
-  { category: 'ACADEMIC PARTNERS', brands: ['GDF Academic Badge'] },
-  { category: 'PLATFORM PROVIDERS', brands: ['Luma'] },
-  { category: 'TECHNICAL PARTNERS', brands: ['Jitsi', 'OpenAI', 'Lenovo', 'Alibaba Cloud'] },
-  { category: 'SPONSORS', brands: ['Prezi'] },
-];
-
-const team = [
-  { name: 'Rajiv Rathod', role: 'Supreme Leader of GDF, Founder' },
-  { name: 'Lucki Linesh', role: 'Co Supreme Leader of GDF, Co-Founder' },
-  { name: 'Shreta Das', role: 'HR Specialist / Chief of Staff' },
-  { name: 'Zainab Fatima Waseem', role: 'HR Specialist' },
-  { name: 'Saeemah', role: 'Outreach Executive' },
-  { name: 'Madhav Rajyaguru', role: 'Content Creator' },
-  { name: 'Nysa', role: 'Conference Manager (UAE)' },
-  { name: 'Rudraksh Chatterjee', role: 'Research' },
-  { name: 'Astha', role: 'Head of Research' },
-  { name: 'Sai Sahas', role: 'Content Creator' },
-  { name: 'Prabhkhel', role: 'AXIS Relations Intern' },
-  { name: 'Shamil', role: 'Graphic Designer' },
-  { name: 'Muhammad Talah', role: 'Backend Developer' },
-];
+/* -------------------------------------------------------------------------- */
+/*                                   motion                                   */
+/* -------------------------------------------------------------------------- */
 
 const fadeUp = {
-  hidden: { opacity: 0, y: 28 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.64, ease: [0.22, 1, 0.36, 1] },
-  },
+  hidden: { opacity: 0, y: 26 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] } },
 };
 
 const stagger = {
   hidden: {},
-  visible: {
-    transition: { staggerChildren: 0.08, delayChildren: 0.05 },
-  },
+  visible: { transition: { staggerChildren: 0.07, delayChildren: 0.04 } },
 };
+
+const pageTransition = {
+  initial: { opacity: 0, y: 18 },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.45, ease: [0.22, 1, 0.36, 1] } },
+  exit: { opacity: 0, y: -12, transition: { duration: 0.22, ease: 'easeIn' } },
+};
+
+const reveal = {
+  variants: fadeUp,
+  initial: 'hidden',
+  whileInView: 'visible',
+  viewport: { once: true, amount: 0.2 },
+};
+
+/* -------------------------------------------------------------------------- */
+/*                                    hooks                                   */
+/* -------------------------------------------------------------------------- */
 
 function useTheme() {
   const [theme, setTheme] = useState(() => {
@@ -80,35 +59,84 @@ function useTheme() {
 
   useEffect(() => {
     const root = document.documentElement;
-    const meta = document.querySelector('meta[name="theme-color"]');
     root.classList.toggle('dark', theme === 'dark');
     localStorage.setItem('gdf-theme', theme);
-    meta?.setAttribute('content', theme === 'dark' ? '#0A0712' : '#F8F9FF');
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute('content', theme === 'dark' ? '#0A0712' : '#F8F9FF');
   }, [theme]);
 
   return [theme, setTheme];
 }
 
-function SectionTitle({ eyebrow, title, children, align = 'center' }) {
+/**
+ * Returns the routed page id for the current hash, or `null` when the hash is
+ * an in-page anchor (e.g. "#experiences") that must not trigger navigation.
+ */
+function routeFromHash() {
+  if (typeof window === 'undefined') return 'home';
+  const raw = window.location.hash;
+  if (!raw || raw === '#') return 'home';
+  if (!raw.startsWith('#/')) return null;
+  const id = raw.slice(2).replace(/\/$/, '');
+  if (!id) return 'home';
+  return pages.some((page) => page.id === id) ? id : 'home';
+}
+
+function useHashRoute() {
+  const [pageId, setPageId] = useState(() => routeFromHash() ?? 'home');
+
+  useEffect(() => {
+    const onHashChange = () => {
+      const next = routeFromHash();
+      if (next === null) return; // in-page anchor: let the browser scroll
+      setPageId(next);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
+
+  return pageId;
+}
+
+/* -------------------------------------------------------------------------- */
+/*                                  primitives                                */
+/* -------------------------------------------------------------------------- */
+
+function Emblem({ className = 'h-12 w-12', iconClassName = 'h-6 w-6' }) {
   return (
-    <motion.div
-      variants={fadeUp}
-      initial="hidden"
-      whileInView="visible"
-      viewport={{ once: true, amount: 0.28 }}
-      className={align === 'center' ? 'mx-auto max-w-4xl text-center' : 'max-w-4xl'}
+    <span
+      className={`logo-emblem relative grid shrink-0 place-items-center overflow-hidden rounded-full border border-purple-200/70 bg-white/85 text-gdf-violet shadow-glow dark:border-purple-500/30 dark:bg-gdf-darkCard/85 dark:text-gdf-glow ${className}`}
     >
+      <Globe2 className={`relative z-10 ${iconClassName}`} strokeWidth={1.9} />
+    </span>
+  );
+}
+
+function Eyebrow({ children, icon: Icon = Sparkles }) {
+  return (
+    <span className="inline-flex items-center gap-2 rounded-full border border-purple-200/70 bg-white/75 px-4 py-2 text-[0.68rem] font-black uppercase tracking-[0.26em] text-gdf-magenta shadow-sm backdrop-blur dark:border-purple-500/30 dark:bg-gdf-darkCard/70 dark:text-gdf-pink sm:text-xs">
+      <Icon className="h-4 w-4" />
+      {children}
+    </span>
+  );
+}
+
+function SectionHeading({ eyebrow, title, children, align = 'center', icon, as: Tag = 'h2' }) {
+  const alignment = align === 'center' ? 'mx-auto max-w-4xl text-center' : 'max-w-4xl';
+  return (
+    <motion.div {...reveal} className={alignment}>
       {eyebrow ? (
-        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-purple-200/70 bg-white/70 px-4 py-2 text-xs font-black uppercase tracking-[0.28em] text-gdf-magenta shadow-sm backdrop-blur dark:border-purple-500/30 dark:bg-gdf-darkCard/70 dark:text-gdf-pink">
-          <Sparkles className="h-4 w-4" />
-          {eyebrow}
+        <div className="mb-5">
+          <Eyebrow icon={icon}>{eyebrow}</Eyebrow>
         </div>
       ) : null}
-      <h2 className="font-display text-3xl font-black uppercase tracking-[-0.04em] text-gdf-navy dark:text-white sm:text-4xl lg:text-5xl">
+      <Tag className="font-display text-3xl font-black uppercase leading-[1.04] tracking-[-0.045em] text-gdf-navy dark:text-white sm:text-4xl lg:text-5xl">
         {title}
-      </h2>
+      </Tag>
       {children ? (
-        <p className="mt-5 text-base leading-8 text-gdf-muted dark:text-gdf-lavender sm:text-lg">
+        <p className="mt-6 text-base leading-8 text-gdf-muted dark:text-gdf-lavender sm:text-lg sm:leading-9">
           {children}
         </p>
       ) : null}
@@ -116,320 +144,10 @@ function SectionTitle({ eyebrow, title, children, align = 'center' }) {
   );
 }
 
-function Header({ theme, setTheme }) {
+function Section({ id, children, className = '' }) {
   return (
-    <header className="sticky top-0 z-50 border-b border-purple-200/50 bg-white/70 shadow-sm shadow-purple-900/5 backdrop-blur-2xl transition-colors duration-500 dark:border-purple-500/20 dark:bg-[#0a0712]/72 dark:shadow-black/20">
-      <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
-        <a href="#home" className="group flex min-w-0 items-center gap-3" aria-label="GDF GLOBAL DIPLOMACY FORUM">
-          <span className="logo-emblem relative grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-full border border-purple-200/70 bg-white/85 text-gdf-violet shadow-glow transition-transform duration-500 group-hover:scale-105 dark:border-purple-500/30 dark:bg-gdf-darkCard/85 dark:text-gdf-glow">
-            <Globe2 className="relative z-10 h-6 w-6" strokeWidth={1.9} />
-          </span>
-          <span className="truncate font-display text-sm font-black uppercase tracking-[0.18em] text-gdf-navy dark:text-white sm:text-base">
-            GDF GLOBAL DIPLOMACY FORUM
-          </span>
-        </a>
-
-        <nav className="hidden items-center gap-1 rounded-full border border-purple-200/40 bg-white/45 p-1 backdrop-blur-xl dark:border-purple-500/20 dark:bg-white/5 lg:flex" aria-label="Primary navigation">
-          {navItems.map((item) => (
-            <a
-              key={item.href}
-              href={item.href}
-              className="rounded-full px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] text-gdf-muted transition hover:bg-purple-50 hover:text-gdf-magenta dark:text-gdf-lavender dark:hover:bg-purple-500/10 dark:hover:text-white"
-            >
-              {item.label}
-            </a>
-          ))}
-        </nav>
-
-        <button
-          type="button"
-          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-          aria-label="Light/Dark Mode Toggle Switch"
-          aria-pressed={theme === 'dark'}
-          className="relative flex h-11 w-20 shrink-0 items-center rounded-full border border-purple-200/70 bg-white/70 p-1 shadow-inner shadow-purple-900/10 transition-colors duration-500 dark:border-purple-500/40 dark:bg-gdf-darkCard/80"
-        >
-          <span className="sr-only">Light/Dark Mode Toggle Switch</span>
-          <span
-            className={`absolute inset-y-1 grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br shadow-lg transition-all duration-500 ${
-              theme === 'dark'
-                ? 'left-[calc(100%-2.5rem)] from-gdf-pink to-gdf-glow text-white shadow-purple-900/40'
-                : 'left-1 from-gdf-magenta to-gdf-violet text-white shadow-purple-700/25'
-            }`}
-          >
-            {theme === 'dark' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
-          </span>
-          <Sun className="ml-2 h-4 w-4 text-gdf-magenta/60 dark:text-white/25" />
-          <Moon className="ml-auto mr-2 h-4 w-4 text-gdf-violet/45 dark:text-gdf-lavender/80" />
-        </button>
-      </div>
-    </header>
-  );
-}
-
-function Hero() {
-  return (
-    <section id="home" className="relative isolate overflow-hidden px-4 pb-16 pt-12 sm:px-6 sm:pb-20 sm:pt-16 lg:px-8 lg:pb-28 lg:pt-24">
-      <div className="absolute left-1/2 top-20 -z-10 h-[38rem] w-[38rem] -translate-x-1/2 rounded-full bg-gdf-violet/10 blur-3xl dark:bg-gdf-glow/10" />
-      <motion.div
-        variants={stagger}
-        initial="hidden"
-        animate="visible"
-        className="mx-auto grid max-w-7xl items-center gap-12 lg:grid-cols-[1.08fr_0.92fr]"
-      >
-        <div>
-          <motion.div
-            variants={fadeUp}
-            className="mb-6 inline-flex items-center gap-2 rounded-full border border-purple-200/70 bg-white/75 px-4 py-2 text-xs font-black uppercase tracking-[0.24em] text-gdf-magenta shadow-sm backdrop-blur dark:border-purple-500/30 dark:bg-gdf-darkCard/70 dark:text-gdf-pink"
-          >
-            <Globe2 className="h-4 w-4" />
-            GDF OMAN SMART DIPLOMACY HUB
-          </motion.div>
-          <motion.h1
-            variants={fadeUp}
-            className="font-display text-5xl font-black uppercase leading-[0.91] tracking-[-0.075em] text-gdf-navy dark:text-white sm:text-6xl md:text-7xl xl:text-8xl"
-          >
-            COMMITTED TO EMPOWERING YOUR TOMORROW
-          </motion.h1>
-          <motion.p
-            variants={fadeUp}
-            className="mt-7 max-w-2xl text-xl font-semibold leading-8 text-gdf-muted dark:text-gdf-lavender sm:text-2xl"
-          >
-            Debate. Negotiate. Lead the World
-          </motion.p>
-          <motion.div variants={fadeUp} className="mt-10 flex flex-wrap gap-4">
-            <a
-              href="#experiences"
-              className="group inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-gdf-magenta to-gdf-violet px-7 py-4 text-sm font-black uppercase tracking-[0.18em] text-white shadow-glow-pink transition duration-300 hover:-translate-y-1 hover:shadow-glow dark:from-gdf-pink dark:to-gdf-glow"
-            >
-              VIRTUAL MUN EXPERIENCES
-              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-            </a>
-            <a
-              href="#future"
-              className="inline-flex items-center gap-2 rounded-full border border-purple-200/70 bg-white/70 px-7 py-4 text-sm font-black uppercase tracking-[0.18em] text-gdf-navy shadow-sm backdrop-blur transition duration-300 hover:-translate-y-1 hover:border-gdf-magenta hover:text-gdf-magenta dark:border-purple-500/30 dark:bg-gdf-darkCard/70 dark:text-white dark:hover:border-gdf-pink dark:hover:text-gdf-pink"
-            >
-              THE FUTURE OF DIPLOMACY IN OMAN
-            </a>
-          </motion.div>
-        </div>
-
-        <motion.div variants={fadeUp} className="relative mx-auto aspect-square w-full max-w-[38rem]">
-          <div className="absolute inset-0 rounded-full bg-gradient-to-br from-gdf-magenta/18 via-gdf-violet/18 to-transparent blur-2xl dark:from-gdf-pink/16 dark:via-gdf-glow/24" />
-          <motion.div
-            className="hero-orbit absolute inset-4 rounded-full border border-purple-200/60 shadow-glow dark:border-purple-500/30"
-            animate={{ rotate: 360 }}
-            transition={{ duration: 34, ease: 'linear', repeat: Infinity }}
-          />
-          <motion.div
-            className="absolute left-4 top-12 h-28 w-28 rounded-full border border-fuchsia-200 bg-white/55 shadow-glow backdrop-blur dark:border-fuchsia-500/30 dark:bg-gdf-darkCard/65"
-            animate={{ y: [0, -18, 0], x: [0, 10, 0] }}
-            transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
-          />
-          <motion.div
-            className="absolute bottom-10 right-8 h-36 w-36 rounded-full border border-violet-200 bg-white/45 shadow-glow backdrop-blur dark:border-violet-500/30 dark:bg-gdf-darkCard/55"
-            animate={{ y: [0, 18, 0], x: [0, -8, 0] }}
-            transition={{ duration: 7.5, repeat: Infinity, ease: 'easeInOut' }}
-          />
-          <motion.div
-            className="absolute right-16 top-6 h-16 w-16 rounded-full bg-gradient-to-br from-gdf-magenta to-gdf-violet shadow-glow-pink dark:from-gdf-pink dark:to-gdf-glow"
-            animate={{ scale: [1, 1.16, 1], opacity: [0.9, 1, 0.9] }}
-            transition={{ duration: 4.5, repeat: Infinity, ease: 'easeInOut' }}
-          />
-          <div className="absolute inset-0 grid place-items-center">
-            <div className="glass-card grid h-48 w-48 place-items-center rounded-full sm:h-60 sm:w-60">
-              <Globe2 className="h-20 w-20 text-gdf-violet dark:text-gdf-glow sm:h-24 sm:w-24" strokeWidth={1.35} />
-            </div>
-          </div>
-        </motion.div>
-      </motion.div>
-    </section>
-  );
-}
-
-function About() {
-  return (
-    <section id="future" className="px-4 py-16 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl">
-        <SectionTitle title="THE FUTURE OF DIPLOMACY IN OMAN">
-          The Global Diplomacy Forum (GDF) is a community-run international diplomacy hub in Oman, known as the 'Bridge of the Middle East.' It serves as a neutral ground for global citizens to connect and develop Smart Diplomacy and leadership skills. GDF aligns with Oman Vision 2040, promoting inclusivity and ensuring everyone has a voice in international collaboration.
-        </SectionTitle>
-      </div>
-    </section>
-  );
-}
-
-function Experiences() {
-  return (
-    <section id="experiences" className="px-4 py-16 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl">
-        <SectionTitle title="VIRTUAL MUN EXPERIENCES">
-          Welcome to Global Diplomacy Forum - your premier destination for immersive online Model United Nations experiences. Explore our virtual conferences, skill-building workshops, and expert support designed to empower the next generation of global leaders. Click on each service to learn how we bring diplomacy to life, no matter where you are.
-        </SectionTitle>
-
-        <motion.div
-          variants={stagger}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, amount: 0.12 }}
-          className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4"
-        >
-          {conferences.map((conference, index) => (
-            <motion.article
-              key={conference.title}
-              variants={fadeUp}
-              className="glass-card group relative overflow-hidden rounded-2xl p-6 transition duration-500 hover:-translate-y-2"
-            >
-              <div className="absolute -right-10 -top-10 h-28 w-28 rounded-full bg-gdf-violet/12 transition group-hover:scale-125 dark:bg-gdf-glow/15" />
-              <div className="relative mb-8 flex items-center justify-between">
-                <span className="grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-purple-100 to-fuchsia-100 text-sm font-black text-gdf-violet dark:from-purple-500/15 dark:to-pink-500/15 dark:text-gdf-glow">
-                  {String(index + 1).padStart(2, '0')}
-                </span>
-                <CalendarClock className="h-5 w-5 text-gdf-magenta dark:text-gdf-pink" />
-              </div>
-              <h3 className="relative font-display text-2xl font-black uppercase tracking-[-0.035em] text-gdf-navy dark:text-white">
-                {conference.title}
-              </h3>
-              {conference.tone === 'active' ? (
-                <a
-                  href="mailto:info@gdf.social?subject=GLO%20DIS%20V%202026%20Registration"
-                  className="relative mt-7 inline-flex w-full items-center justify-center rounded-full bg-gradient-to-r from-gdf-magenta to-gdf-violet px-5 py-3 text-sm font-black uppercase tracking-[0.14em] text-white shadow-glow-pink transition hover:-translate-y-1 dark:from-gdf-pink dark:to-gdf-glow"
-                >
-                  {conference.status}
-                </a>
-              ) : (
-                <button
-                  type="button"
-                  disabled
-                  className={`relative mt-7 inline-flex w-full cursor-not-allowed items-center justify-center rounded-full border px-5 py-3 text-sm font-black uppercase tracking-[0.14em] opacity-90 ${
-                    conference.tone === 'closed'
-                      ? 'border-slate-200 bg-slate-100 text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-gdf-lavender/70'
-                      : 'border-purple-200 bg-purple-50 text-gdf-violet dark:border-purple-500/20 dark:bg-purple-500/10 dark:text-gdf-lavender'
-                  }`}
-                >
-                  {conference.status}
-                </button>
-              )}
-            </motion.article>
-          ))}
-        </motion.div>
-      </div>
-    </section>
-  );
-}
-
-function VisionMission() {
-  return (
-    <section id="vision" className="px-4 py-16 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl">
-        <SectionTitle title="VISION AND MISSION STATEMENTS" />
-        <motion.div
-          variants={stagger}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, amount: 0.18 }}
-          className="mt-12 grid gap-6 lg:grid-cols-2"
-        >
-          <motion.article variants={fadeUp} className="glass-card rounded-2xl p-7 sm:p-9">
-            <div className="mb-6 grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-gdf-magenta to-gdf-violet text-white shadow-glow-pink dark:from-gdf-pink dark:to-gdf-glow">
-              <BadgeCheck className="h-7 w-7" />
-            </div>
-            <h3 className="font-display text-2xl font-black uppercase tracking-[-0.03em] text-gdf-navy dark:text-white">OUR VISION</h3>
-            <p className="mt-5 text-base leading-8 text-gdf-muted dark:text-gdf-lavender sm:text-lg">
-              At Global Diplomacy Forum (GDF), our vision is to cultivate a generation of globally aware, action-driven youth who are prepared to lead with empathy, insight, and integrity. We strive to create a world where diplomacy is not just practiced in international halls but championed in classrooms, communities, and conversations empowering young minds to shape a more just, peaceful, and cooperative future.
-            </p>
-          </motion.article>
-          <motion.article variants={fadeUp} className="glass-card rounded-2xl p-7 sm:p-9">
-            <div className="mb-6 grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-gdf-violet to-gdf-magenta text-white shadow-glow dark:from-gdf-glow dark:to-gdf-pink">
-              <UsersRound className="h-7 w-7" />
-            </div>
-            <h3 className="font-display text-2xl font-black uppercase tracking-[-0.03em] text-gdf-navy dark:text-white">OUR MISSION</h3>
-            <p className="mt-5 text-base leading-8 text-gdf-muted dark:text-gdf-lavender sm:text-lg">
-              Our mission is to offer an inclusive and impactful platform for students through virtual Model UN conferences that reflect real-world diplomacy. By fostering critical thinking, public speaking, and global collaboration, we aim to shape the next generation of leaders. With accessible opportunities and innovative formats, GDF is redefining how youth connect with global issues—making diplomacy digital, dynamic, and meaningful.
-            </p>
-          </motion.article>
-        </motion.div>
-      </div>
-    </section>
-  );
-}
-
-function LetterAndAxis() {
-  return (
-    <section className="px-4 py-16 sm:px-6 lg:px-8">
-      <div className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-[1.08fr_0.92fr]">
-        <motion.article
-          variants={fadeUp}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, amount: 0.18 }}
-          className="glass-card relative overflow-hidden rounded-2xl p-7 sm:p-9"
-        >
-          <div className="absolute -right-16 -top-16 h-52 w-52 rounded-full bg-gdf-magenta/10 blur-2xl dark:bg-gdf-pink/12" />
-          <h2 className="relative font-display text-3xl font-black uppercase tracking-[-0.04em] text-gdf-navy dark:text-white sm:text-4xl">
-            LETTER FROM OUR LEADER
-          </h2>
-          <p className="relative mt-6 text-base leading-8 text-gdf-muted dark:text-gdf-lavender sm:text-lg">
-            Welcome to the Global Diplomacy Forum. GDF began with a simple idea: to unite passionate young minds to collaborate and face global challenges. Your ideas and voice matter here—whether you're organizing, debating, or just starting out. You're valued and essential to our community. As we grow,we are committed to keeping GDF inclusive, exciting, and purposeful. Bring your energy and creativity—together, we're building the world of tomorrow.
-          </p>
-          <p className="relative mt-7 font-display text-xl font-black text-gdf-magenta dark:text-gdf-pink">
-            {'-Rajiv Rathod and Lucki Linesh '}
-          </p>
-        </motion.article>
-
-        <motion.article
-          id="axis"
-          variants={fadeUp}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, amount: 0.18 }}
-          className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-gdf-magenta to-gdf-violet p-7 text-white shadow-glow-pink dark:from-gdf-pink dark:to-gdf-glow sm:p-9"
-        >
-          <div className="absolute -right-20 -top-20 h-60 w-60 rounded-full border border-white/20" />
-          <div className="absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-white/10 blur-xl" />
-          <div className="relative mb-7 grid h-16 w-16 place-items-center rounded-2xl bg-white/16 backdrop-blur">
-            <Globe2 className="h-8 w-8" />
-          </div>
-          <h2 className="relative font-display text-3xl font-black uppercase tracking-[-0.04em] sm:text-4xl">
-            GDF AXIS MUN CIRCUIT
-          </h2>
-          <p className="relative mt-6 text-base leading-8 text-white/88 sm:text-lg">
-            GDF Axis is a worldwide programme created to help students showcase their campus and run MUN conferences on a global level. It opens doors for international connections, meaningful discussions, and a unified space for young leaders.
-          </p>
-        </motion.article>
-      </div>
-    </section>
-  );
-}
-
-function Partners() {
-  return (
-    <section id="partners" className="px-4 py-16 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl">
-        <SectionTitle title="OUR PARTNERS" />
-        <motion.div
-          variants={stagger}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, amount: 0.15 }}
-          className="mt-12 grid gap-5 md:grid-cols-2 xl:grid-cols-5"
-        >
-          {partners.map((group) => (
-            <motion.article key={group.category} variants={fadeUp} className="glass-card rounded-2xl p-6">
-              <h3 className="text-xs font-black uppercase tracking-[0.22em] text-gdf-magenta dark:text-gdf-pink">{group.category}</h3>
-              <div className="mt-6 flex flex-wrap gap-3">
-                {group.brands.map((brand) => (
-                  <span
-                    key={brand}
-                    className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-purple-200/70 bg-white/75 px-4 text-sm font-black text-gdf-navy shadow-sm dark:border-purple-500/30 dark:bg-white/5 dark:text-white"
-                  >
-                    {brand}
-                  </span>
-                ))}
-              </div>
-            </motion.article>
-          ))}
-        </motion.div>
-      </div>
+    <section id={id} className={`px-4 py-14 sm:px-6 sm:py-16 lg:px-8 lg:py-20 ${className}`}>
+      <div className="mx-auto max-w-7xl">{children}</div>
     </section>
   );
 }
@@ -452,109 +170,603 @@ function initials(name) {
     .toUpperCase();
 }
 
-function Team() {
-  const highlighted = useMemo(() => new Set(['Rajiv Rathod', 'Lucki Linesh']), []);
+/* -------------------------------------------------------------------------- */
+/*                                   chrome                                   */
+/* -------------------------------------------------------------------------- */
+
+function AnnouncementBar() {
+  const items = Array.from({ length: 6 });
+  return (
+    <div className="relative overflow-hidden bg-gradient-to-r from-gdf-magenta via-gdf-violet to-gdf-magenta py-2.5 text-white dark:from-gdf-pink dark:via-gdf-glow dark:to-gdf-pink">
+      <div className="marquee-track flex w-max items-center gap-10 whitespace-nowrap">
+        {items.map((_, index) => (
+          <span
+            key={index}
+            className="flex items-center gap-10 text-[0.65rem] font-black uppercase tracking-[0.3em] sm:text-xs"
+          >
+            {home.announcement}
+            <Sparkles className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function Header({ theme, setTheme, pageId }) {
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    setOpen(false);
+  }, [pageId]);
 
   return (
-    <section id="team" className="px-4 py-16 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl">
-        <SectionTitle title="CORE TEAM" />
-        <motion.div
-          variants={stagger}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, amount: 0.1 }}
-          className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+    <header className="sticky top-0 z-50 border-b border-purple-200/50 bg-white/75 shadow-sm shadow-purple-900/5 backdrop-blur-2xl transition-colors duration-500 dark:border-purple-500/20 dark:bg-[#0a0712]/75">
+      <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
+        <a href="#/" className="group flex min-w-0 items-center gap-3" aria-label={site.title}>
+          <Emblem className="h-11 w-11 transition-transform duration-500 group-hover:scale-105" iconClassName="h-5 w-5" />
+          <span className="min-w-0">
+            <span className="block truncate font-display text-sm font-black uppercase leading-tight tracking-[0.16em] text-gdf-navy dark:text-white sm:text-base">
+              Global Diplomacy Forum
+            </span>
+            <span className="hidden text-[0.6rem] font-bold uppercase tracking-[0.3em] text-gdf-magenta dark:text-gdf-pink sm:block">
+              GDF Oman
+            </span>
+          </span>
+        </a>
+
+        <nav
+          className="hidden items-center gap-1 rounded-full border border-purple-200/40 bg-white/50 p-1 backdrop-blur-xl dark:border-purple-500/20 dark:bg-white/5 lg:flex"
+          aria-label="Primary"
         >
-          {team.map((member) => (
-            <motion.article
-              key={member.name}
-              variants={fadeUp}
-              className="glass-card group flex min-h-64 flex-col items-center justify-center rounded-2xl p-6 text-center transition duration-500 hover:-translate-y-2"
-            >
-              <div
-                className={`relative grid h-24 w-24 place-items-center rounded-full border-4 shadow-glow transition duration-500 group-hover:scale-105 ${
-                  highlighted.has(member.name)
-                    ? 'border-gdf-magenta bg-gradient-to-br from-gdf-magenta to-gdf-violet text-white dark:border-gdf-pink dark:from-gdf-pink dark:to-gdf-glow'
-                    : 'border-purple-300 bg-gradient-to-br from-white to-purple-100 text-gdf-violet dark:border-purple-500/50 dark:from-gdf-darkCard dark:to-purple-950 dark:text-gdf-lavender'
+          {pages.map((page) => {
+            const active = page.id === pageId;
+            return (
+              <a
+                key={page.id}
+                href={page.hash}
+                aria-current={active ? 'page' : undefined}
+                className={`rounded-full px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] transition ${
+                  active
+                    ? 'bg-gradient-to-r from-gdf-magenta to-gdf-violet text-white shadow-glow-pink dark:from-gdf-pink dark:to-gdf-glow'
+                    : 'text-gdf-muted hover:bg-purple-50 hover:text-gdf-magenta dark:text-gdf-lavender dark:hover:bg-purple-500/10 dark:hover:text-white'
                 }`}
               >
-                <span className="font-display text-2xl font-black tracking-[-0.06em]">{initials(member.name)}</span>
-              </div>
-              <h3 className="mt-6 font-display text-xl font-black tracking-[-0.03em] text-gdf-navy dark:text-white">{member.name}</h3>
-              <p className="mt-3 text-sm font-semibold leading-6 text-gdf-muted dark:text-gdf-lavender">{member.role}</p>
-            </motion.article>
-          ))}
-        </motion.div>
+                {page.label}
+              </a>
+            );
+          })}
+        </nav>
+
+        <div className="flex items-center gap-2">
+          <a
+            href={`mailto:${site.email}`}
+            className="hidden items-center gap-2 rounded-full bg-gradient-to-r from-gdf-magenta to-gdf-violet px-5 py-3 text-xs font-black uppercase tracking-[0.16em] text-white shadow-glow-pink transition duration-300 hover:-translate-y-0.5 dark:from-gdf-pink dark:to-gdf-glow xl:inline-flex"
+          >
+            Contact
+            <ArrowUpRight className="h-4 w-4" />
+          </a>
+
+          <button
+            type="button"
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            aria-label="Light/Dark Mode Toggle Switch"
+            aria-pressed={theme === 'dark'}
+            className="relative grid h-11 w-11 shrink-0 place-items-center rounded-full border border-purple-200/70 bg-white/70 text-gdf-magenta shadow-inner shadow-purple-900/10 transition-colors duration-500 hover:text-gdf-violet dark:border-purple-500/40 dark:bg-gdf-darkCard/80 dark:text-gdf-lavender"
+          >
+            {theme === 'dark' ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setOpen((value) => !value)}
+            aria-label={open ? 'Close menu' : 'Open menu'}
+            aria-expanded={open}
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-purple-200/70 bg-white/70 text-gdf-navy transition dark:border-purple-500/40 dark:bg-gdf-darkCard/80 dark:text-white lg:hidden"
+          >
+            {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
+        </div>
       </div>
-    </section>
+
+      <AnimatePresence initial={false}>
+        {open ? (
+          <motion.nav
+            key="mobile-nav"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+            className="overflow-hidden border-t border-purple-200/50 bg-white/95 backdrop-blur-xl dark:border-purple-500/20 dark:bg-[#0a0712]/95 lg:hidden"
+            aria-label="Mobile"
+          >
+            <div className="flex flex-col gap-1 px-4 py-4 sm:px-6">
+              {pages.map((page) => (
+                <a
+                  key={page.id}
+                  href={page.hash}
+                  className={`rounded-2xl px-4 py-3 text-sm font-bold uppercase tracking-[0.16em] transition ${
+                    page.id === pageId
+                      ? 'bg-gradient-to-r from-gdf-magenta to-gdf-violet text-white dark:from-gdf-pink dark:to-gdf-glow'
+                      : 'text-gdf-muted hover:bg-purple-50 hover:text-gdf-magenta dark:text-gdf-lavender dark:hover:bg-purple-500/10'
+                  }`}
+                >
+                  {page.label}
+                </a>
+              ))}
+              <a
+                href={`mailto:${site.email}`}
+                className="mt-2 inline-flex items-center justify-center gap-2 rounded-2xl border border-purple-200/70 px-4 py-3 text-sm font-black uppercase tracking-[0.16em] text-gdf-magenta dark:border-purple-500/30 dark:text-gdf-pink"
+              >
+                {site.email}
+                <ArrowUpRight className="h-4 w-4" />
+              </a>
+            </div>
+          </motion.nav>
+        ) : null}
+      </AnimatePresence>
+    </header>
   );
 }
 
 function Footer() {
   return (
-    <footer id="footer" className="px-4 pb-8 pt-16 sm:px-6 lg:px-8">
+    <footer className="px-4 pb-8 pt-10 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl overflow-hidden rounded-[2rem] border border-purple-200/50 bg-white/75 shadow-glow backdrop-blur-2xl dark:border-purple-500/25 dark:bg-gdf-darkCard/80">
-        <div className="relative overflow-hidden bg-gradient-to-r from-gdf-magenta via-gdf-violet to-gdf-magenta px-6 py-10 text-center text-white dark:from-gdf-pink dark:via-gdf-glow dark:to-gdf-pink sm:px-10">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(255,255,255,0.24),transparent_28%),radial-gradient(circle_at_80%_0%,rgba(255,255,255,0.18),transparent_30%)]" />
-          <h2 className="relative font-display text-3xl font-black uppercase tracking-[-0.045em] sm:text-4xl lg:text-5xl">
-            CONNECT TO WHAT COUNTS — DEBATE. NEGOTIATE. LEAD THE WORLD
-          </h2>
+        <div className="relative overflow-hidden bg-gradient-to-br from-gdf-magenta via-gdf-violet to-gdf-magenta px-6 py-12 text-white dark:from-gdf-pink dark:via-gdf-glow dark:to-gdf-pink sm:px-10 sm:py-14">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(255,255,255,0.26),transparent_30%),radial-gradient(circle_at_82%_0%,rgba(255,255,255,0.18),transparent_32%)]" />
+          <div className="absolute -bottom-24 -right-16 h-64 w-64 rounded-full border border-white/20" />
+          <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+            <h2 className="font-display text-4xl font-black uppercase leading-[0.92] tracking-[-0.05em] sm:text-5xl lg:text-6xl">
+              {footer.heading.map((line) => (
+                <span key={line} className="block">
+                  {line}
+                </span>
+              ))}
+            </h2>
+            <p className="max-w-sm text-sm font-black uppercase tracking-[0.2em] text-white/90 sm:text-base">
+              {footer.subheading}
+            </p>
+          </div>
         </div>
 
-        <div className="grid gap-8 px-6 py-10 sm:px-10 lg:grid-cols-[1fr_auto] lg:items-center">
+        <div className="grid gap-10 px-6 py-10 sm:px-10 lg:grid-cols-[1.1fr_1fr]">
           <div>
             <div className="flex items-center gap-3">
-              <span className="logo-emblem relative grid h-11 w-11 place-items-center rounded-full border border-purple-200/70 bg-white/75 text-gdf-violet dark:border-purple-500/30 dark:bg-white/5 dark:text-gdf-glow">
-                <Globe2 className="relative z-10 h-5 w-5" />
-              </span>
-              <p className="font-display text-xl font-black uppercase tracking-[0.14em] text-gdf-navy dark:text-white">GLOBAL DIPLOMACY FORUM</p>
+              <Emblem className="h-12 w-12" iconClassName="h-5 w-5" />
+              <p className="font-display text-xl font-black uppercase leading-tight tracking-[0.12em] text-gdf-navy dark:text-white sm:text-2xl">
+                {site.name}
+              </p>
             </div>
-            <div className="mt-6 flex flex-col gap-4 text-sm font-bold uppercase tracking-[0.12em] text-gdf-muted dark:text-gdf-lavender sm:flex-row sm:flex-wrap">
-              <a href="tel:+96896267906" className="inline-flex items-center gap-2 transition hover:text-gdf-magenta dark:hover:text-gdf-pink">
-                <Phone className="h-4 w-4" />
-                PHONE: +968 96267906
+            <p className="mt-5 max-w-md text-sm leading-7 text-gdf-muted dark:text-gdf-lavender">
+              {home.tagline}
+            </p>
+          </div>
+
+          <div className="grid gap-8 sm:grid-cols-3">
+            <div>
+              <h3 className="text-[0.65rem] font-black uppercase tracking-[0.26em] text-gdf-magenta dark:text-gdf-pink">
+                {footer.labels.phone}
+              </h3>
+              <a
+                href={site.phoneHref}
+                className="mt-3 inline-flex items-center gap-2 text-sm font-bold text-gdf-navy transition hover:text-gdf-magenta dark:text-white dark:hover:text-gdf-pink"
+              >
+                <Phone className="h-4 w-4 shrink-0" />
+                {site.phone}
               </a>
-              <a href="mailto:info@gdf.social" className="inline-flex items-center gap-2 transition hover:text-gdf-magenta dark:hover:text-gdf-pink">
-                <Mail className="h-4 w-4" />
-                EMAIL: info@gdf.social
+            </div>
+            <div>
+              <h3 className="text-[0.65rem] font-black uppercase tracking-[0.26em] text-gdf-magenta dark:text-gdf-pink">
+                {footer.labels.email}
+              </h3>
+              <a
+                href={`mailto:${site.email}`}
+                className="mt-3 inline-flex items-center gap-2 break-all text-sm font-bold text-gdf-navy transition hover:text-gdf-magenta dark:text-white dark:hover:text-gdf-pink"
+              >
+                <Mail className="h-4 w-4 shrink-0" />
+                {site.email}
+              </a>
+            </div>
+            <div>
+              <h3 className="text-[0.65rem] font-black uppercase tracking-[0.26em] text-gdf-magenta dark:text-gdf-pink">
+                {footer.labels.social}
+              </h3>
+              <a
+                href={site.linkedin}
+                target="_blank"
+                rel="noreferrer"
+                aria-label="LinkedIn"
+                className="mt-3 grid h-11 w-11 place-items-center rounded-full bg-gradient-to-br from-gdf-magenta to-gdf-violet text-white shadow-glow-pink transition hover:-translate-y-1 dark:from-gdf-pink dark:to-gdf-glow"
+              >
+                <LinkedInIcon className="h-5 w-5" />
               </a>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-black uppercase tracking-[0.18em] text-gdf-muted dark:text-gdf-lavender">SOCIAL:</span>
-            <a
-              href="https://www.linkedin.com/company/global-diplomacy-forum/"
-              target="_blank"
-              rel="noreferrer"
-              aria-label="LinkedIn"
-              className="grid h-12 w-12 place-items-center rounded-full bg-gradient-to-br from-gdf-magenta to-gdf-violet text-white shadow-glow-pink transition hover:-translate-y-1 dark:from-gdf-pink dark:to-gdf-glow"
-            >
-              <LinkedInIcon className="h-5 w-5" />
-            </a>
-          </div>
+        </div>
+
+        <div className="border-t border-purple-200/50 px-6 py-5 text-center text-[0.7rem] font-bold uppercase tracking-[0.2em] text-gdf-muted dark:border-purple-500/20 dark:text-gdf-lavender sm:px-10">
+          © {new Date().getFullYear()} {site.name} — {site.shortName} Oman
         </div>
       </div>
     </footer>
   );
 }
 
+/* -------------------------------------------------------------------------- */
+/*                              page 1 — home                                 */
+/* -------------------------------------------------------------------------- */
+
+function HeroVisual() {
+  return (
+    <motion.div variants={fadeUp} className="relative mx-auto aspect-square w-full max-w-[34rem]">
+      <div className="absolute inset-0 rounded-full bg-gradient-to-br from-gdf-magenta/18 via-gdf-violet/18 to-transparent blur-2xl dark:from-gdf-pink/16 dark:via-gdf-glow/24" />
+      <motion.div
+        className="hero-orbit absolute inset-4 rounded-full border border-purple-200/60 shadow-glow dark:border-purple-500/30"
+        animate={{ rotate: 360 }}
+        transition={{ duration: 36, ease: 'linear', repeat: Infinity }}
+      />
+      <motion.div
+        className="absolute left-2 top-14 h-24 w-24 rounded-full border border-fuchsia-200 bg-white/55 shadow-glow backdrop-blur dark:border-fuchsia-500/30 dark:bg-gdf-darkCard/65"
+        animate={{ y: [0, -16, 0], x: [0, 10, 0] }}
+        transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
+      />
+      <motion.div
+        className="absolute bottom-8 right-6 h-32 w-32 rounded-full border border-violet-200 bg-white/45 shadow-glow backdrop-blur dark:border-violet-500/30 dark:bg-gdf-darkCard/55"
+        animate={{ y: [0, 18, 0], x: [0, -8, 0] }}
+        transition={{ duration: 7.5, repeat: Infinity, ease: 'easeInOut' }}
+      />
+      <motion.div
+        className="absolute right-14 top-4 h-14 w-14 rounded-full bg-gradient-to-br from-gdf-magenta to-gdf-violet shadow-glow-pink dark:from-gdf-pink dark:to-gdf-glow"
+        animate={{ scale: [1, 1.16, 1], opacity: [0.9, 1, 0.9] }}
+        transition={{ duration: 4.5, repeat: Infinity, ease: 'easeInOut' }}
+      />
+      <div className="absolute inset-0 grid place-items-center">
+        <div className="glass-card grid h-44 w-44 place-items-center rounded-full sm:h-56 sm:w-56">
+          <Globe2 className="h-20 w-20 text-gdf-violet dark:text-gdf-glow sm:h-24 sm:w-24" strokeWidth={1.3} />
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+function HomePage() {
+  return (
+    <>
+      <section className="relative isolate overflow-hidden px-4 pb-12 pt-10 sm:px-6 sm:pt-14 lg:px-8 lg:pb-16 lg:pt-20">
+        <div className="absolute left-1/2 top-16 -z-10 h-[34rem] w-[34rem] -translate-x-1/2 rounded-full bg-gdf-violet/10 blur-3xl dark:bg-gdf-glow/10" />
+        <motion.div
+          variants={stagger}
+          initial="hidden"
+          animate="visible"
+          className="mx-auto grid max-w-7xl items-center gap-12 lg:grid-cols-[1.05fr_0.95fr]"
+        >
+          <div>
+            <motion.div variants={fadeUp}>
+              <Eyebrow icon={Globe2}>{home.tagline}</Eyebrow>
+            </motion.div>
+
+            <motion.h1
+              variants={fadeUp}
+              className="mt-7 font-display text-5xl font-black uppercase leading-[0.9] tracking-[-0.06em] text-gdf-navy dark:text-white sm:text-6xl lg:text-7xl xl:text-8xl"
+            >
+              <span className="block">{home.headline[0]}</span>
+              <span className="block bg-gradient-to-r from-gdf-magenta via-gdf-violet to-gdf-magenta bg-clip-text text-transparent dark:from-gdf-pink dark:via-gdf-glow dark:to-gdf-pink">
+                {home.headline[1]}
+              </span>
+              <span className="block">{home.headline[2]}</span>
+            </motion.h1>
+
+            <motion.p
+              variants={fadeUp}
+              className="mt-8 max-w-xl text-base leading-8 text-gdf-muted dark:text-gdf-lavender sm:text-lg sm:leading-9"
+            >
+              {home.intro}
+            </motion.p>
+
+            <motion.div variants={fadeUp} className="mt-10 flex flex-wrap gap-4">
+              <a
+                href="#experiences"
+                className="group inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-gdf-magenta to-gdf-violet px-7 py-4 text-xs font-black uppercase tracking-[0.18em] text-white shadow-glow-pink transition duration-300 hover:-translate-y-1 hover:shadow-glow dark:from-gdf-pink dark:to-gdf-glow sm:text-sm"
+              >
+                Virtual MUN Experiences
+                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+              </a>
+              <a
+                href="#/about"
+                className="inline-flex items-center gap-2 rounded-full border border-purple-200/70 bg-white/70 px-7 py-4 text-xs font-black uppercase tracking-[0.18em] text-gdf-navy shadow-sm backdrop-blur transition duration-300 hover:-translate-y-1 hover:border-gdf-magenta hover:text-gdf-magenta dark:border-purple-500/30 dark:bg-gdf-darkCard/70 dark:text-white dark:hover:border-gdf-pink dark:hover:text-gdf-pink sm:text-sm"
+              >
+                About GDF
+              </a>
+            </motion.div>
+          </div>
+
+          <HeroVisual />
+        </motion.div>
+      </section>
+
+      <Section id="experiences">
+        <SectionHeading eyebrow="Virtual MUN" title={home.experiences.title}>
+          {home.experiences.body}
+        </SectionHeading>
+
+        <motion.div
+          variants={stagger}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, amount: 0.1 }}
+          className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4"
+        >
+          {conferences.map((conference, index) => (
+            <motion.article
+              key={conference.numeral}
+              variants={fadeUp}
+              className="glass-card group relative flex flex-col overflow-hidden rounded-3xl p-6 transition duration-500 hover:-translate-y-2"
+            >
+              <div className="absolute -right-10 -top-10 h-28 w-28 rounded-full bg-gdf-violet/12 transition duration-500 group-hover:scale-125 dark:bg-gdf-glow/15" />
+              <div className="relative mb-8 flex items-center justify-between">
+                <span className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-purple-100 to-fuchsia-100 text-xs font-black text-gdf-violet dark:from-purple-500/15 dark:to-pink-500/15 dark:text-gdf-glow">
+                  {String(index + 1).padStart(2, '0')}
+                </span>
+                <CalendarClock className="h-5 w-5 text-gdf-magenta dark:text-gdf-pink" />
+              </div>
+              <h3 className="relative font-display text-2xl font-black uppercase leading-tight tracking-[-0.04em] text-gdf-navy dark:text-white">
+                Glo DIs {conference.numeral}
+                <span className="block text-gdf-magenta dark:text-gdf-pink">{conference.year}</span>
+              </h3>
+              <div className="relative mt-auto pt-7">
+                {conference.tone === 'active' ? (
+                  <a
+                    href={`mailto:${site.email}?subject=Glo%20DIs%20${conference.numeral}%20${conference.year}%20Registration`}
+                    className="inline-flex w-full items-center justify-center rounded-full bg-gradient-to-r from-gdf-magenta to-gdf-violet px-5 py-3 text-xs font-black uppercase tracking-[0.14em] text-white shadow-glow-pink transition hover:-translate-y-1 dark:from-gdf-pink dark:to-gdf-glow"
+                  >
+                    {conference.status}
+                  </a>
+                ) : (
+                  <span
+                    className={`inline-flex w-full items-center justify-center rounded-full border px-5 py-3 text-xs font-black uppercase tracking-[0.14em] ${
+                      conference.tone === 'closed'
+                        ? 'border-slate-200 bg-slate-100 text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-gdf-lavender/70'
+                        : 'border-purple-200 bg-purple-50 text-gdf-violet dark:border-purple-500/20 dark:bg-purple-500/10 dark:text-gdf-lavender'
+                    }`}
+                  >
+                    {conference.status}
+                  </span>
+                )}
+              </div>
+            </motion.article>
+          ))}
+        </motion.div>
+      </Section>
+
+      <Section id="partners">
+        <SectionHeading title="Our Partners" />
+        <motion.div
+          variants={stagger}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, amount: 0.12 }}
+          className="mt-12 grid gap-5 sm:grid-cols-2 xl:grid-cols-5"
+        >
+          {partners.map((group) => (
+            <motion.article key={group.category} variants={fadeUp} className="glass-card rounded-3xl p-6">
+              <h3 className="text-[0.65rem] font-black uppercase tracking-[0.22em] text-gdf-magenta dark:text-gdf-pink sm:text-xs">
+                {group.category}
+              </h3>
+              <div className="mt-6 flex flex-wrap gap-3">
+                {group.brands.map((brand) => (
+                  <span
+                    key={brand}
+                    className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-purple-200/70 bg-white/75 px-4 text-sm font-black text-gdf-navy shadow-sm dark:border-purple-500/30 dark:bg-white/5 dark:text-white"
+                  >
+                    {brand}
+                  </span>
+                ))}
+              </div>
+            </motion.article>
+          ))}
+        </motion.div>
+      </Section>
+    </>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*                              page 2 — about                                */
+/* -------------------------------------------------------------------------- */
+
+function AboutPage() {
+  const statements = [
+    { ...about.vision, icon: Compass },
+    { ...about.mission, icon: Target },
+  ];
+
+  return (
+    <>
+      <Section>
+        <motion.div {...reveal} className="glass-card relative overflow-hidden rounded-[2rem] p-7 sm:p-10 lg:p-14">
+          <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-gdf-magenta/10 blur-3xl dark:bg-gdf-pink/12" />
+          <div className="relative">
+            <Eyebrow icon={Globe2}>About Us</Eyebrow>
+            <p className="mt-7 max-w-4xl text-lg leading-9 text-gdf-navy dark:text-white sm:text-xl sm:leading-10">
+              {about.intro}
+            </p>
+          </div>
+        </motion.div>
+      </Section>
+
+      <Section id="vision">
+        <SectionHeading eyebrow={about.statementsEyebrow} title={about.statementsTitle} as="h1" />
+        <motion.div
+          variants={stagger}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, amount: 0.15 }}
+          className="mt-12 grid gap-6 lg:grid-cols-2"
+        >
+          {statements.map((statement) => (
+            <motion.article key={statement.title} variants={fadeUp} className="glass-card rounded-3xl p-7 sm:p-9">
+              <div className="mb-6 grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-gdf-magenta to-gdf-violet text-white shadow-glow-pink dark:from-gdf-pink dark:to-gdf-glow">
+                <statement.icon className="h-7 w-7" />
+              </div>
+              <h3 className="font-display text-2xl font-black uppercase tracking-[-0.035em] text-gdf-navy dark:text-white sm:text-3xl">
+                {statement.title}
+              </h3>
+              <p className="mt-5 text-base leading-8 text-gdf-muted dark:text-gdf-lavender sm:text-lg sm:leading-9">
+                {statement.body}
+              </p>
+            </motion.article>
+          ))}
+        </motion.div>
+      </Section>
+
+      <Section id="letter">
+        <motion.article {...reveal} className="glass-card relative overflow-hidden rounded-[2rem] p-7 sm:p-10 lg:p-14">
+          <div className="absolute -left-16 -bottom-16 h-60 w-60 rounded-full bg-gdf-violet/10 blur-3xl dark:bg-gdf-glow/12" />
+          <Quote className="absolute right-8 top-8 h-16 w-16 text-gdf-magenta/12 dark:text-gdf-pink/15 sm:h-24 sm:w-24" />
+          <div className="relative">
+            <h2 className="font-display text-3xl font-black uppercase tracking-[-0.045em] text-gdf-navy dark:text-white sm:text-4xl lg:text-5xl">
+              {about.letter.title}
+            </h2>
+            <div className="mt-8 max-w-3xl space-y-5">
+              {about.letter.paragraphs.map((paragraph) => (
+                <p key={paragraph} className="text-base leading-8 text-gdf-muted dark:text-gdf-lavender sm:text-lg sm:leading-9">
+                  {paragraph}
+                </p>
+              ))}
+            </div>
+            <p className="mt-9 font-display text-xl font-black tracking-[-0.02em] text-gdf-magenta dark:text-gdf-pink sm:text-2xl">
+              {about.letter.signature}
+            </p>
+          </div>
+        </motion.article>
+      </Section>
+    </>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*                               page 3 — axis                                */
+/* -------------------------------------------------------------------------- */
+
+function AxisPage() {
+  return (
+    <Section id="axis">
+      <motion.article
+        {...reveal}
+        className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-gdf-magenta via-gdf-violet to-gdf-magenta p-8 text-white shadow-glow-pink dark:from-gdf-pink dark:via-gdf-glow dark:to-gdf-pink sm:p-12 lg:p-16"
+      >
+        <div className="absolute -right-24 -top-24 h-80 w-80 rounded-full border border-white/20" />
+        <div className="absolute -right-10 -top-10 h-56 w-56 rounded-full border border-white/15" />
+        <div className="absolute -bottom-28 -left-24 h-80 w-80 rounded-full bg-white/10 blur-2xl" />
+
+        <div className="relative max-w-3xl">
+          <div className="mb-8 grid h-16 w-16 place-items-center rounded-2xl bg-white/16 backdrop-blur">
+            <Globe2 className="h-8 w-8" />
+          </div>
+          <h1 className="font-display text-4xl font-black uppercase leading-[0.95] tracking-[-0.05em] sm:text-5xl lg:text-6xl">
+            {axis.title}
+          </h1>
+          <p className="mt-8 text-base leading-8 text-white/90 sm:text-lg sm:leading-9">{axis.body}</p>
+
+          <a
+            href={`mailto:${site.email}?subject=GDF%20AXIS%20MUN%20CIRCUIT`}
+            className="group mt-10 inline-flex items-center gap-2 rounded-full bg-white px-7 py-4 text-xs font-black uppercase tracking-[0.18em] text-gdf-magenta shadow-lg transition duration-300 hover:-translate-y-1 dark:text-gdf-pink sm:text-sm"
+          >
+            Join the Circuit
+            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+          </a>
+        </div>
+      </motion.article>
+    </Section>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*                               page 4 — team                                */
+/* -------------------------------------------------------------------------- */
+
+function TeamPage() {
+  const leaders = new Set(['Rajiv Rathod', 'Lucki Linesh']);
+
+  return (
+    <Section id="team">
+      <SectionHeading eyebrow="Global Diplomacy Forum" title="Core Team" icon={Users} as="h1" />
+
+      <motion.div
+        variants={stagger}
+        initial="hidden"
+        whileInView="visible"
+        viewport={{ once: true, amount: 0.05 }}
+        className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+      >
+        {team.map((member) => (
+          <motion.article
+            key={member.name}
+            variants={fadeUp}
+            className="glass-card group flex min-h-[17rem] flex-col items-center justify-center rounded-3xl p-6 text-center transition duration-500 hover:-translate-y-2"
+          >
+            <div
+              className={`grid h-24 w-24 place-items-center rounded-full border-4 shadow-glow transition duration-500 group-hover:scale-105 ${
+                leaders.has(member.name)
+                  ? 'border-gdf-magenta bg-gradient-to-br from-gdf-magenta to-gdf-violet text-white dark:border-gdf-pink dark:from-gdf-pink dark:to-gdf-glow'
+                  : 'border-purple-300 bg-gradient-to-br from-white to-purple-100 text-gdf-violet dark:border-purple-500/50 dark:from-gdf-darkCard dark:to-purple-950 dark:text-gdf-lavender'
+              }`}
+            >
+              <span className="font-display text-2xl font-black tracking-[-0.06em]">{initials(member.name)}</span>
+            </div>
+            <h3 className="mt-6 font-display text-lg font-black leading-tight tracking-[-0.03em] text-gdf-navy dark:text-white sm:text-xl">
+              {member.name}
+            </h3>
+            <div className="mt-3 space-y-0.5">
+              {member.role.map((line) => (
+                <p key={line} className="text-sm font-semibold leading-6 text-gdf-muted dark:text-gdf-lavender">
+                  {line}
+                </p>
+              ))}
+            </div>
+          </motion.article>
+        ))}
+      </motion.div>
+    </Section>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*                                    app                                     */
+/* -------------------------------------------------------------------------- */
+
+const views = {
+  home: HomePage,
+  about: AboutPage,
+  axis: AxisPage,
+  team: TeamPage,
+};
+
 export default function App() {
   const [theme, setTheme] = useTheme();
+  const pageId = useHashRoute();
+  const View = views[pageId] ?? HomePage;
+
+  const setTitle = useCallback(() => {
+    const page = pages.find((item) => item.id === pageId);
+    document.title = pageId === 'home' ? site.title : `${page.label} | ${site.name}`;
+  }, [pageId]);
+
+  useEffect(setTitle, [setTitle]);
 
   return (
     <div className="bg-site-light min-h-screen text-gdf-navy transition-colors duration-500 dark:text-white">
       <div className="noise-overlay" />
-      <div className="relative z-10">
-        <Header theme={theme} setTheme={setTheme} />
-        <main>
-          <Hero />
-          <About />
-          <Experiences />
-          <VisionMission />
-          <LetterAndAxis />
-          <Partners />
-          <Team />
+      <div className="relative z-10 flex min-h-screen flex-col">
+        <AnnouncementBar />
+        <Header theme={theme} setTheme={setTheme} pageId={pageId} />
+        <main className="flex-1">
+          <AnimatePresence mode="wait">
+            <motion.div key={pageId} {...pageTransition}>
+              <View />
+            </motion.div>
+          </AnimatePresence>
         </main>
         <Footer />
       </div>
